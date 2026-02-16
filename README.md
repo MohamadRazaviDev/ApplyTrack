@@ -1,54 +1,53 @@
 # ApplyTrack
 
-A personal "mini-ATS" to track applications, parse descriptions, and tailor your CV with AI.
+A personal **mini-ATS** to track job applications, parse descriptions, and tailor your CV with AI.
 
 ## Features
 
-- **Application Pipeline**: Kanban board to track applications through stages (Draft -> Applied -> Interview -> Offer).
-- **AI Assistant**: 
-  - **Parse JD**: Extracts skills, responsibilities, and keywords from raw job descriptions.
-  - **Match Score**: Analyzes your profile against the JD to identify gaps and generate a match score.
-  - **Tailor CV**: Suggests project bullets tailored to the specific role.
-- **Evidence-Based AI**: Every AI claim is grounded in your profile data or the job description (no hallucinations).
-- **Dashboard**: Quick overview of your application stats.
+- **Kanban Board** — Drag-and-drop applications through stages (Not Applied → Applied → Interview → Offer → Rejected → Archived).
+- **AI Assistant** (5 modules):
+  - **Parse JD** — Extract skills, responsibilities, and keywords from job descriptions.
+  - **Match Score** — Analyse your profile against the JD and identify gaps.
+  - **Tailor CV** — Generate bullet suggestions grounded in your experience.
+  - **Outreach** — Draft LinkedIn and email messages.
+  - **Interview Prep** — Likely questions, checklists, and STAR story suggestions.
+- **Smart Reminders** — Set follow-up reminders tied to each application.
+- **Dashboard** — Stats, recent activity, and upcoming reminders at a glance.
+- **Evidence-Based AI** — Every claim links back to your profile or the job description.
 
 ## Tech Stack
 
-- **Backend**: Python (FastAPI), SQLAlchemy (Async), Pydantic v2, Celery (Background Tasks), Redis.
-- **Frontend**: Next.js (App Router), Tailwind CSS, TanStack Query, DnD Kit.
-- **Database**: Postgres (Production), SQLite (Dev/Test).
-- **AI**: OpenAI Client (compatible with OpenRouter/Anthropic).
+| Layer | Stack |
+|-------|-------|
+| Backend | Python 3.12, FastAPI, SQLAlchemy (async), Pydantic v2, Celery, Redis |
+| Frontend | Next.js 16, Tailwind CSS v4, TanStack Query, DnD Kit |
+| Database | PostgreSQL (production), SQLite (local dev) |
+| AI | OpenAI-compatible client (OpenRouter, Anthropic, etc.) — with full mock mode |
 
-## Getting Started
+## Quick Start
 
-### Prerequisites
+### Docker (recommended)
 
-- Docker & Docker Compose
-- Node.js 18+ (for local frontend dev)
-- Python 3.11+ (for local backend dev)
+```bash
+cp .env.example .env      # edit secrets as needed
+docker compose up --build
+```
 
-### Quick Start (Docker)
-
-1.  Clone the repository.
-2.  Create a `.env` file in the root directory (copy `.env.example`).
-3.  Run:
-    ```bash
-    docker-compose up --build
-    ```
-4.  Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000).
 
 ### Local Development
 
-**Backend**:
+**Backend:**
 
 ```bash
 cd backend
-pip install poetry
-poetry install
-poetry run uvicorn applytrack.main:app --reload
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn applytrack.main:app --reload
 ```
 
-**Frontend**:
+**Frontend:**
 
 ```bash
 cd frontend
@@ -56,16 +55,41 @@ npm install
 npm run dev
 ```
 
-**Worker**:
+**Celery Worker** (optional — skip if `CELERY_ALWAYS_EAGER=true`):
 
 ```bash
 cd backend
-poetry run celery -A applytrack.workers.celery_app worker --loglevel=info
+source .venv/bin/activate
+celery -A applytrack.workers.celery_app worker --loglevel=info
 ```
 
-## AI Configuration
+### Makefile Shortcuts
 
-To use real AI features, set `APPLYTRACK_OPENROUTER_API_KEY` in your `.env` file. By default, the system runs in **Mock Mode**, returning simulated responses for testing without cost.
+```bash
+make install-backend   # create venv + install deps
+make install-frontend  # npm install
+make run-backend       # uvicorn --reload
+make run-frontend      # npm run dev
+make run-worker        # celery worker
+make docker-up         # docker compose up --build
+make lint              # ruff check + format
+make test              # pytest
+make seed              # populate demo data
+```
+
+## Configuration
+
+Copy `.env.example` to `.env`. Key variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `sqlite+aiosqlite:///./applytrack.db` | DB connection string |
+| `JWT_SECRET` | dev placeholder | **Change in production** |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis for Celery |
+| `CELERY_ALWAYS_EAGER` | `false` | `true` = run tasks inline (no Redis needed) |
+| `AI_MODE` | `mock` | `mock` or `real` |
+| `AI_API_KEY` | empty | Required when `AI_MODE=real` |
+| `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated allowed origins |
 
 ## License
 

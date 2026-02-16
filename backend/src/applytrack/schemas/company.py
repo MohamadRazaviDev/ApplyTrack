@@ -1,23 +1,20 @@
-from typing import Optional
-from pydantic import BaseModel, HttpUrl
+"""Company schemas."""
 
-class CompanyBase(BaseModel):
+from datetime import datetime
+
+from pydantic import BaseModel
+
+
+class CompanyCreate(BaseModel):
     name: str
-    website_url: Optional[str] = None
-    linkedin_url: Optional[str] = None
-    careers_url: Optional[str] = None
-    hq_location: Optional[str] = None
-    notes: Optional[str] = None
+    website_url: str | None = None
 
-class CompanyCreate(CompanyBase):
-    pass
 
-class CompanyUpdate(CompanyBase):
-    pass
-
-class CompanyResponse(CompanyBase):
+class CompanyResponse(BaseModel):
     id: str
-    created_at: str
-    
-    class Config:
-        from_attributes = True
+    name: str
+    website_url: str | None = None
+    hq_location: str | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

@@ -1,70 +1,69 @@
+"""Auth endpoints: register, login, current user."""
+
 from typing import Annotated
-from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from applytrack.db.session import get_db
-from applytrack.db.models.user import User
+from applytrack.api.deps import get_current_user
+from applytrack.core.config import settings
+from applytrack.core.security import create_access_token, hash_password, verify_password
 from applytrack.db.models.profile import Profile
-from applytrack.schemas.auth import UserCreate, Token, UserResponse
-from applytrack.core.security import get_password_hash, verify_password, create_access_token
+from applytrack.db.models.user import User
+from applytrack.db.session import get_db
+from applytrack.schemas.auth import Token, UserCreate, UserResponse
 
 router = APIRouter()
 
-@router.post("/register", response_model=UserResponse)
-async def register(
-    user_in: UserCreate,
-    db: Annotated[AsyncSession, Depends(get_db)]
-):
-    result = await db.execute(select(User).where(User.email == user_in.email))
-    existing_user = result.scalars().first()
-    
-    if existing_user:
+
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def register(body: UserCreate, db: Annotated[AsyncSession, Depends(get_db)]):
+    if not settings.allow_registration:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is currently disabled",
+        )
+
+    existing = await db.execute(select(User).where(User.email == body.email))
+    if existing.scalars().first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            detail="An account with this email already exists",
         )
-    
-    hashed_password = get_password_hash(user_in.password)
-    user = User(email=user_in.email, password_hash=hashed_password)
+
+    user = User(email=body.email, password_hash=hash_password(body.password))
     db.add(user)
+    await db.flush()
+
+    # every user gets a blank profile on signup
+    db.add(Profile(user_id=user.id))
     await db.commit()
     await db.refresh(user)
-
-    # Create empty profile
-    profile = Profile(user_id=user.id)
-    db.add(profile)
-    await db.commit()
-    
     return user
+
 
 @router.post("/login", response_model=Token)
 async def login(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    # Using OAuth2PasswordRequestForm which expects 'username' and 'password'
-    # We treat 'username' as email
+    """OAuth2-compatible login.  The 'username' field is treated as the email."""
     result = await db.execute(select(User).where(User.email == form_data.username))
     user = result.scalars().first()
-    
+
     if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    access_token = create_access_token(subject=user.id)
-    return {"access_token": access_token, "token_type": "bearer"}
 
-from applytrack.api.deps import get_current_user
+    token = create_access_token(subject=user.id)
+    return Token(access_token=token)
+
 
 @router.get("/me", response_model=UserResponse)
-async def read_users_me(
-    current_user: Annotated[User, Depends(get_current_user)]
-):
+async def whoami(current_user: Annotated[User, Depends(get_current_user)]):
     return current_user

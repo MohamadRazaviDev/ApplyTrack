@@ -5,145 +5,141 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import KanbanColumn from '@/components/KanbanColumn';
 import NewApplicationModal from '@/components/NewApplicationModal';
-import { Application } from '@/lib/types';
-import { 
-  DndContext, 
-  DragEndEvent, 
-  DragOverlay, 
-  DragStartEvent, 
-  useSensor, 
-  useSensors, 
+import { Application, KANBAN_COLUMNS, STATUS_META, ApplicationStatus } from '@/lib/types';
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  useSensor,
+  useSensors,
   PointerSensor,
-  closestCorners
+  closestCorners,
 } from '@dnd-kit/core';
 import ApplicationCard from '@/components/ApplicationCard';
-
-// Define status columns (IDs must match ApplicationStatus enum)
-const STATUSES = [
-  { id: 'draft', title: 'Draft' },
-  { id: 'applied', title: 'Applied' },
-  { id: 'hr_screen', title: 'HR Screen' },
-  { id: 'tech_screen', title: 'Tech Screen' },
-  { id: 'rejected', title: 'Rejected' },
-];
+import { Plus, Search } from 'lucide-react';
 
 export default function ApplicationsPage() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const { data: applications = [], isLoading } = useQuery<Application[]>({
     queryKey: ['applications'],
-    queryFn: async () => {
-      const res = await api.get('/applications');
-      return res.data;
-    },
+    queryFn: async () => (await api.get('/applications')).data,
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string, status: string }) => {
-      await api.post(`/applications/${id}/status`, { status }); // Actually backend implementation might differ
-      // The previous implementation used PATCH /applications/{id}
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
       await api.patch(`/applications/${id}`, { status });
     },
     onMutate: async ({ id, status }) => {
       await queryClient.cancelQueries({ queryKey: ['applications'] });
-      const previousApps = queryClient.getQueryData<Application[]>(['applications']);
-
-      queryClient.setQueryData<Application[]>(['applications'], (old) => {
-        return old?.map(app => app.id === id ? { ...app, status } : app) || [];
-      });
-
-      return { previousApps };
+      const prev = queryClient.getQueryData<Application[]>(['applications']);
+      queryClient.setQueryData<Application[]>(['applications'], (old) =>
+        old?.map((a) => (a.id === id ? { ...a, status: status as ApplicationStatus } : a)) || [],
+      );
+      return { prev };
     },
-    onError: (err, newApp, context) => {
-      if (context?.previousApps) {
-        queryClient.setQueryData(['applications'], context.previousApps);
-      }
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['applications'], ctx.prev);
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
-    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['applications'] }),
   });
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
-  };
+  const handleDragStart = (event: DragStartEvent) => setActiveId(event.active.id as string);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    const activeId = active.id as string;
     setActiveId(null);
-
     if (!over) return;
 
+    const draggedId = active.id as string;
     const overId = over.id as string;
-    
-    // Find dragged app
-    const app = applications.find(a => a.id === activeId);
+    const app = applications.find((a) => a.id === draggedId);
     if (!app) return;
 
-    let newStatus = app.status;
-
-    // Check if dropped on a column container (droppable id = status)
-    if (STATUSES.some(s => s.id === overId)) {
-        newStatus = overId;
+    let newStatus = app.status as string;
+    if (KANBAN_COLUMNS.includes(overId as ApplicationStatus)) {
+      newStatus = overId;
     } else {
-        // Dropped on another item? find its status
-        const overApp = applications.find(a => a.id === overId);
-        if (overApp) {
-            newStatus = overApp.status;
-        }
+      const overApp = applications.find((a) => a.id === overId);
+      if (overApp) newStatus = overApp.status;
     }
 
     if (newStatus !== app.status) {
-        updateStatusMutation.mutate({ id: activeId, status: newStatus });
+      updateStatusMutation.mutate({ id: draggedId, status: newStatus });
     }
   };
 
-  const activeApp = activeId ? applications.find(a => a.id === activeId) : null;
+  // filter by search
+  const filtered = search
+    ? applications.filter((a) => {
+      const q = search.toLowerCase();
+      return (
+        (a.job_posting?.title || '').toLowerCase().includes(q) ||
+        (a.job_posting?.company?.name || '').toLowerCase().includes(q)
+      );
+    })
+    : applications;
 
-  if (isLoading) return <div className="p-8">Loading applications...</div>;
+  const activeApp = activeId ? applications.find((a) => a.id === activeId) : null;
+
+  if (isLoading) {
+    return (
+      <div className="flex gap-4 p-4 overflow-x-auto">
+        {KANBAN_COLUMNS.map((col) => (
+          <div key={col} className="skeleton w-72 min-w-[18rem] h-96 rounded-xl" />
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <div className="h-[calc(100vh-100px)] flex flex-col p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Applications Board</h1>
+    <div className="h-[calc(100vh-56px)] flex flex-col p-4">
+      {/* toolbar */}
+      <div className="flex items-center justify-between mb-4 gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
+          <input
+            type="text"
+            placeholder="Search company or role…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-[var(--border)] bg-white pl-9 pr-4 py-2 text-sm focus:border-[var(--accent)] focus:ring-2 focus:ring-indigo-100 outline-none transition"
+          />
+        </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 font-medium shadow-sm transition-colors"
+          className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] transition-colors shadow-sm"
         >
-          + New Application
+          <Plus size={16} /> New Application
         </button>
       </div>
 
-      <DndContext 
-        sensors={sensors} 
+      {/* kanban board */}
+      <DndContext
+        sensors={sensors}
         collisionDetection={closestCorners}
-        onDragStart={handleDragStart} 
+        onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4 h-full items-start">
-          {STATUSES.map(col => (
+        <div className="flex gap-4 overflow-x-auto pb-4 flex-1 items-start">
+          {KANBAN_COLUMNS.map((col) => (
             <KanbanColumn
-              key={col.id}
-              id={col.id}
-              title={col.title}
-              applications={applications.filter(app => app.status === col.id)}
+              key={col}
+              id={col}
+              title={STATUS_META[col].label}
+              applications={filtered.filter((a) => a.status === col)}
             />
           ))}
         </div>
-        <DragOverlay>
-            {activeApp ? <ApplicationCard application={activeApp} /> : null}
-        </DragOverlay>
+        <DragOverlay>{activeApp ? <ApplicationCard application={activeApp} /> : null}</DragOverlay>
       </DndContext>
 
       <NewApplicationModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />

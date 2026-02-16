@@ -1,4 +1,4 @@
-# Logs
+# ── Logs ──
 logs
 *.log
 npm-debug.log*
@@ -7,12 +7,13 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# ── Dependencies ──
 node_modules
 dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# ── Editor directories and files ──
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -23,30 +24,51 @@ dist-ssr
 *.sln
 *.sw?
 
-# Testing
+# ── Testing ──
 coverage
 .nyc_output
 
-# Next.js
+# ── Next.js ──
 .next/
 out/
 build
 
-# Vercel
+# ── Vercel ──
 .vercel
 
-# TypeScript
+# ── TypeScript ──
 *.tsbuildinfo
 next-env.d.ts
 
-# Backend
+# ── Python / Backend ──
 __pycache__/
 *.py[cod]
 *$py.class
+*.egg-info/
+*.egg
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# ── Virtual environments ──
 backend/.venv
 backend/venv
 backend/env
+
+# ── Secrets / Environment ──
 .env
-.pytest_cache/
-backend/applytrack.db
-backend/test.db
+.env.local
+.env.*.local
+
+# ── Databases ──
+*.db
+*.sqlite3
+
+# ── OS files ──
+Thumbs.db
+.DS_Store
+
+# ── Docker ──
+docker-compose.override.yml
