@@ -10,9 +10,8 @@ we test AI endpoints by verifying:
 """
 
 import pytest
+from conftest import register_and_login
 from httpx import AsyncClient
-
-from tests.conftest import register_and_login
 
 
 async def _create_app_for_ai(client: AsyncClient):
