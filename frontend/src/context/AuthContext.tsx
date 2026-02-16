@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 
@@ -20,8 +20,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
-  login: () => {},
-  logout: () => {},
+  login: () => { },
+  logout: () => { },
   isAuthenticated: false,
 });
 
@@ -31,40 +31,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    async function loadUser() {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const res = await api.get('/auth/me');
-          setUser(res.data);
-        } catch (error) {
-          console.error('Failed to load user', error);
-          localStorage.removeItem('token');
-        }
-      }
-      setLoading(false);
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setLoading(false); // eslint-disable-line react-hooks/set-state-in-effect
+      return;
     }
-    loadUser();
+    api
+      .get('/auth/me')
+      .then((res) => setUser(res.data))
+      .catch(() => localStorage.removeItem('token'))
+      .finally(() => setLoading(false));
   }, []);
 
-  const login = (token: string) => {
-    localStorage.setItem('token', token);
-    // Reload user
-    api.get('/auth/me')
-      .then((res) => {
-        setUser(res.data);
-        router.push('/dashboard');
-      })
-      .catch((err) => {
-        console.error("Login failed after token set", err);
-      });
-  };
+  const login = useCallback(
+    (token: string) => {
+      localStorage.setItem('token', token);
+      api
+        .get('/auth/me')
+        .then((res) => {
+          setUser(res.data);
+          router.push('/dashboard');
+        })
+        .catch(() => {
+          localStorage.removeItem('token');
+        });
+    },
+    [router],
+  );
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('token');
     setUser(null);
     router.push('/login');
-  };
+  }, [router]);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated: !!user }}>

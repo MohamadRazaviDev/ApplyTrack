@@ -1,41 +1,54 @@
-from typing import Optional, List
-from datetime import datetime
-from pydantic import BaseModel, HttpUrl, Field
-from applytrack.db.models.application import ApplicationStatus, ApplicationPriority
-from applytrack.db.models.job_posting import RemoteType, JobSource
+"""Application and job posting schemas."""
 
-class JobPostingCreate(BaseModel):
-    url: str
-    description: Optional[str] = None
-    title: Optional[str] = None
-    company_name: Optional[str] = None
+from datetime import datetime
+
+from pydantic import BaseModel
+
+from applytrack.db.models.application import ApplicationPriority, ApplicationStatus
+from applytrack.db.models.job_posting import JobSource, RemoteType
+from applytrack.schemas.company import CompanyResponse
+
+# --- job posting ---
+
 
 class JobPostingResponse(BaseModel):
     id: str
     title: str
-    company_id: Optional[str] = None
-    location: Optional[str] = None
+    company_id: str | None = None
+    location: str | None = None
     remote_type: RemoteType
-    posting_url: Optional[str] = None
+    posting_url: str | None = None
     source: JobSource
-    description_raw: Optional[str] = None
+    description_raw: str | None = None
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
+
+    company: CompanyResponse | None = None
+
+    model_config = {"from_attributes": True}
+
+
+# --- application ---
+
 
 class ApplicationCreate(BaseModel):
-    job_posting_id: str
-    status: ApplicationStatus = ApplicationStatus.draft
+    """Flat creation payload — company + job posting are created automatically."""
+
+    company_name: str
+    role_title: str
+    job_url: str | None = None
+    job_description: str | None = None
+    status: ApplicationStatus = ApplicationStatus.not_applied
     priority: ApplicationPriority = ApplicationPriority.medium
-    notes: Optional[str] = None
+    notes: str = ""
+
 
 class ApplicationUpdate(BaseModel):
-    status: Optional[ApplicationStatus] = None
-    priority: Optional[ApplicationPriority] = None
-    notes: Optional[str] = None
-    next_followup_at: Optional[datetime] = None
-    salary_expectation: Optional[int] = None
+    status: ApplicationStatus | None = None
+    priority: ApplicationPriority | None = None
+    notes: str | None = None
+    next_followup_at: datetime | None = None
+    salary_expectation: int | None = None
+
 
 class ApplicationResponse(BaseModel):
     id: str
@@ -44,13 +57,12 @@ class ApplicationResponse(BaseModel):
     status: ApplicationStatus
     priority: ApplicationPriority
     notes: str
-    applied_at: Optional[datetime] = None
-    next_followup_at: Optional[datetime] = None
-    salary_expectation: Optional[int] = None
+    applied_at: datetime | None = None
+    next_followup_at: datetime | None = None
+    salary_expectation: int | None = None
     created_at: datetime
     updated_at: datetime
-    
-    job_posting: Optional[JobPostingResponse] = None
-    
-    class Config:
-        from_attributes = True
+
+    job_posting: JobPostingResponse | None = None
+
+    model_config = {"from_attributes": True}

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:16
@@ -24,10 +22,11 @@ services:
     command: uvicorn applytrack.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/applytrack
+      - JWT_SECRET=docker-dev-secret-change-in-production
       - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - SECRET_KEY=changethis
+      - CELERY_ALWAYS_EAGER=false
+      - AI_MODE=mock
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
     ports:
       - "8000:8000"
     depends_on:
@@ -41,9 +40,9 @@ services:
     command: celery -A applytrack.workers.celery_app worker --loglevel=info
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/applytrack
+      - JWT_SECRET=docker-dev-secret-change-in-production
       - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - AI_MODE=mock
     depends_on:
       - backend
       - redis

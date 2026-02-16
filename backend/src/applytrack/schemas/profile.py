@@ -1,37 +1,42 @@
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, HttpUrl
+"""Profile schemas."""
 
-class Project(BaseModel):
+from pydantic import BaseModel
+
+
+class ProjectItem(BaseModel):
     name: str
     stack: str
-    bullets: List[str]
-    metrics: Optional[str] = None
+    bullets: list[str] = []
+    metrics: str | None = None
 
-class Experience(BaseModel):
+
+class ExperienceItem(BaseModel):
     company: str
     role: str
     start_date: str
-    end_date: Optional[str] = None
-    bullets: List[str]
+    end_date: str | None = None
+    bullets: list[str] = []
 
-class ProfileBase(BaseModel):
-    headline: Optional[str] = None
-    summary: Optional[str] = None
-    location: Optional[str] = None
-    links_json: Optional[Dict[str, str]] = None
-    skills_json: Optional[List[str]] = None
-    projects_json: Optional[List[Project]] = None
-    experience_json: Optional[List[Experience]] = None
 
-class ProfileCreate(ProfileBase):
-    pass
+class ProfileUpdate(BaseModel):
+    headline: str | None = None
+    summary: str | None = None
+    location: str | None = None
+    links_json: dict[str, str] | None = None
+    skills_json: list[str] | None = None
+    projects_json: list[ProjectItem] | None = None
+    experience_json: list[ExperienceItem] | None = None
 
-class ProfileUpdate(ProfileBase):
-    pass
 
-class ProfileResponse(ProfileBase):
+class ProfileResponse(BaseModel):
     id: str
     user_id: str
-    
-    class Config:
-        from_attributes = True
+    headline: str | None = None
+    summary: str | None = None
+    location: str | None = None
+    links_json: dict | None = None
+    skills_json: list | None = None
+    projects_json: list | None = None
+    experience_json: list | None = None
+
+    model_config = {"from_attributes": True}
