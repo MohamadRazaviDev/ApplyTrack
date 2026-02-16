@@ -1,9 +1,8 @@
 """Reminder endpoint tests."""
 
 import pytest
+from conftest import register_and_login
 from httpx import AsyncClient
-
-from tests.conftest import register_and_login
 
 
 async def _create_app_with_reminder_setup(client: AsyncClient):

@@ -1,9 +1,8 @@
 """Application CRUD endpoint tests."""
 
 import pytest
+from conftest import register_and_login
 from httpx import AsyncClient
-
-from tests.conftest import register_and_login
 
 
 async def _create_app(client: AsyncClient, headers: dict, **overrides) -> dict:

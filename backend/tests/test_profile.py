@@ -1,9 +1,8 @@
 """Profile endpoint tests."""
 
 import pytest
+from conftest import register_and_login
 from httpx import AsyncClient
-
-from tests.conftest import register_and_login
 
 
 @pytest.mark.asyncio
