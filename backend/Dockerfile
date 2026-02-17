@@ -3,8 +3,10 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+COPY requirements.txt pyproject.toml ./
+COPY src/ src/
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt \
+    && PYTHONPATH=/install/lib/python3.12/site-packages pip install --no-cache-dir --prefix=/install .
 
 # ── runtime stage ──
 FROM python:3.12-slim

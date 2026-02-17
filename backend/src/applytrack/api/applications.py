@@ -69,11 +69,19 @@ async def create_application(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    # find or create company
-    result = await db.execute(select(Company).where(Company.name == body.company_name))
+    # find or create company (scoped to user)
+    result = await db.execute(
+        select(Company).where(
+            Company.name == body.company_name,
+            Company.user_id == current_user.id,
+        )
+    )
     company = result.scalars().first()
     if not company:
-        company = Company(name=body.company_name)
+        company = Company(
+            name=body.company_name,
+            user_id=current_user.id,
+        )
         db.add(company)
         await db.flush()
 

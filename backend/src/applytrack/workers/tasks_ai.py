@@ -87,12 +87,14 @@ def _save_output(
     data: dict,
     latency: float,
     input_hash: str,
+    evidence: list[dict] | None = None,
 ):
     output = AIOutput(
         application_id=app_id,
         kind=kind,
         input_hash=input_hash,
         output_json=data,
+        evidence_json=evidence or [],
         model=settings.ai_model,
         latency_seconds=latency,
     )
@@ -100,7 +102,33 @@ def _save_output(
     session.commit()
 
 
-def _run_task(app_id: str, kind: AIOutputKind, prompt_builder, schema_cls, needs_profile=False):
+def _extract_evidence(data: dict) -> list[dict]:
+    """Walk validated output and collect all evidence snippets."""
+    evidence = []
+    for key, value in data.items():
+        if isinstance(value, dict) and "source" in value and "text" in value:
+            evidence.append({"field": key, **value})
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    ev = item.get("evidence")
+                    if isinstance(ev, dict) and ev.get("text"):
+                        evidence.append(
+                            {
+                                "field": key,
+                                **ev,
+                            }
+                        )
+    return evidence
+
+
+def _run_task(
+    app_id: str,
+    kind: AIOutputKind,
+    prompt_builder,
+    schema_cls,
+    needs_profile=False,
+):
     """Shared task runner used by every AI task."""
     with _SessionLocal() as session:
         app = _load_app(session, app_id)
@@ -125,18 +153,24 @@ def _run_task(app_id: str, kind: AIOutputKind, prompt_builder, schema_cls, needs
         # call AI (mock or real)
         text, latency = chat_json(system, user, kind=kind.value)
 
-        # parse + validate
-        try:
-            raw = json.loads(text)
-            validated = schema_cls.model_validate(raw)
-            data = validated.model_dump()
-        except Exception:
-            log.exception("AI output validation failed for %s", kind.value)
-            # still save the raw output so nothing is lost
-            data = json.loads(text) if text else {}
+        # parse + validate — failures surface as task errors
+        raw = json.loads(text)
+        validated = schema_cls.model_validate(raw)
+        data = validated.model_dump()
+
+        # extract evidence refs from the validated output
+        evidence = _extract_evidence(data)
 
         input_hash = _hash_inputs(jd_text, json.dumps(profile_data))
-        _save_output(session, app_id, kind, data, latency, input_hash)
+        _save_output(
+            session,
+            app_id,
+            kind,
+            data,
+            latency,
+            input_hash,
+            evidence=evidence,
+        )
         return data
 
 

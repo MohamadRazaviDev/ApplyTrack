@@ -153,7 +153,11 @@ async def seed():
 
         company_objs = []
         for name, url in companies_data:
-            c = Company(name=name, website_url=url)
+            c = Company(
+                name=name,
+                website_url=url,
+                user_id=user.id,
+            )
             db.add(c)
             company_objs.append(c)
         await db.flush()
