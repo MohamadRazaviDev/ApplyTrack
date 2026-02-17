@@ -20,7 +20,9 @@ async def list_companies(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    result = await db.execute(select(Company).order_by(Company.name))
+    result = await db.execute(
+        select(Company).where(Company.user_id == current_user.id).order_by(Company.name)
+    )
     return result.scalars().all()
 
 
@@ -30,7 +32,12 @@ async def read_company(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    result = await db.execute(select(Company).where(Company.id == company_id))
+    result = await db.execute(
+        select(Company).where(
+            Company.id == company_id,
+            Company.user_id == current_user.id,
+        )
+    )
     company = result.scalars().first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
